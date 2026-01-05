@@ -1,42 +1,41 @@
-import express from "express";
-import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import db from "../db.js";
 
-const router = express.Router();
+/**
+ * Verify admin JWT
+ * Expects header:
+ * Authorization: Bearer <token>
+ */
+export function verifyAdmin(req, res, next) {
+  const authHeader = req.headers.authorization;
 
-/* =========================
-   Admin Login
-========================= */
-router.post("/login", async (req, res) => {
-  const { email, password } = req.body;
-
-  if (!email || !password) {
-    return res.status(400).json({ error: "Missing credentials" });
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({
+      error: "Missing or malformed Authorization header",
+    });
   }
 
-  const [[admin]] = await db.query(
-    "SELECT * FROM admins WHERE email = ?",
-    [email]
-  );
+  const token = authHeader.split(" ")[1];
 
-  if (!admin) {
-    return res.status(401).json({ error: "Invalid credentials" });
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Ensure this token belongs to an admin
+    if (!decoded || decoded.isAdmin !== true) {
+      return res.status(403).json({
+        error: "Admin access required",
+      });
+    }
+
+    // Attach admin info to request (optional, future use)
+    req.admin = {
+      id: decoded.adminId,
+      tokenIssuedAt: decoded.iat,
+    };
+
+    next();
+  } catch (err) {
+    return res.status(401).json({
+      error: "Invalid or expired token",
+    });
   }
-
-  const valid = await bcrypt.compare(password, admin.password_hash);
-
-  if (!valid) {
-    return res.status(401).json({ error: "Invalid credentials" });
-  }
-
-  const token = jwt.sign(
-    { adminId: admin.id, isAdmin: true },
-    process.env.JWT_SECRET,
-    { expiresIn: "2h" }
-  );
-
-  res.json({ token });
-});
-
-export default router;
+}
