@@ -3,6 +3,8 @@ import cors from "cors";
 import fs from "fs";
 import path from "path";
 import galleryRoutes from "./routes/gallery.js";
+import authRoutes from "./routes/auth.js";
+
 
 const app = express();
 
@@ -25,6 +27,9 @@ app.use(express.json());
 ========================= */
 app.use("/uploads", express.static("uploads"));
 
+app.use("/api/auth", authRoutes);
+
+
 /* =========================
    Routes
 ========================= */
@@ -38,6 +43,6 @@ app.get("/", (req, res) => {
    Start server
 ========================= */
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () =>
-  console.log(`API running on port ${PORT}`)
-);
+app.listen(PORT, () => {
+  console.log(`API running on port ${PORT}`);
+});
