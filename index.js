@@ -10,10 +10,6 @@ import authRoutes from "./routes/auth.js";
 dotenv.config();
 
 const app = express();
-
-/* =========================
-   ESM __dirname FIX
-========================= */
 const __dirname = new URL(".", import.meta.url).pathname;
 
 /* =========================
@@ -25,24 +21,41 @@ if (!fs.existsSync(uploadDir)) {
 }
 
 /* =========================
-   CORS (CRITICAL FIX)
+   CORS — FINAL & CORRECT
 ========================= */
+const allowedOrigins = [
+  "https://trinnux.com",
+  "https://www.trinnux.com",
+
+  // Railway UAT / Preview domains
+  "https://trinnux-website-uat-production.up.railway.app",
+  "https://trinnux-api-production.up.railway.app",
+
+  // Local dev
+  "http://localhost:3000",
+  "http://localhost:5173",
+];
+
 app.use(
   cors({
-    origin: [
-      "https://trinnux.com",
-      "https://www.trinnux.com",
-      "https://trinnux-api-production.up.railway.app",
-      "http://localhost:3000",
-      "http://localhost:5173",
-    ],
+    origin: function (origin, callback) {
+      // Allow non-browser tools (curl, postman)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      console.error("❌ Blocked by CORS:", origin);
+      return callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true,
   })
 );
 
-/* 🔴 REQUIRED: allow preflight requests */
+/* 🔴 IMPORTANT: handle preflight explicitly */
 app.options("*", cors());
 
 /* =========================
@@ -52,7 +65,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 /* =========================
-   STATIC UPLOADS
+   STATIC FILES
 ========================= */
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
@@ -74,5 +87,5 @@ app.get("/", (_, res) => {
 ========================= */
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-  console.log(`🚀 API running on port ${PORT}`);
+  console.log(`🚀 Trinnux API running on port ${PORT}`);
 });
