@@ -11,15 +11,12 @@ import {
 const router = express.Router();
 
 /* ===============================
-   PUBLIC — GET GALLERY
-================================ */
-/* ===============================
-   PUBLIC — GET GALLERY (PAGINATED)
+   PUBLIC — GET GALLERY (PAGINATED + ORDERED)
 ================================ */
 router.get("/", async (req, res) => {
   try {
-    const page = parseInt(req.query.page || "1");
-    const limit = parseInt(req.query.limit || "12");
+    const page = parseInt(req.query.page || "1", 10);
+    const limit = parseInt(req.query.limit || "12", 10);
     const category = req.query.category;
 
     const offset = (page - 1) * limit;
@@ -32,18 +29,20 @@ router.get("/", async (req, res) => {
       params.push(category);
     }
 
-    // total count
+    /* Total count */
     const [[count]] = await db.query(
-      `SELECT COUNT(*) AS total FROM gallery_images ${where}`,
+      `SELECT COUNT(*) AS total
+       FROM gallery_images
+       ${where}`,
       params
     );
 
-    // paginated rows
+    /* Paginated rows — IMPORTANT: ORDER BY sort_order */
     const [rows] = await db.query(
-      `SELECT id, filename, caption, category, featured
+      `SELECT id, filename, caption, category, featured, sort_order
        FROM gallery_images
        ${where}
-       ORDER BY featured DESC, created_at DESC
+       ORDER BY sort_order ASC, id DESC
        LIMIT ? OFFSET ?`,
       [...params, limit, offset]
     );
@@ -60,6 +59,26 @@ router.get("/", async (req, res) => {
   }
 });
 
+/* ===============================
+   PUBLIC — GET CATEGORIES
+================================ */
+router.get("/categories", async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      `SELECT DISTINCT category
+       FROM gallery_images
+       WHERE status = 'active'
+         AND category IS NOT NULL
+         AND category != ''
+       ORDER BY category ASC`
+    );
+
+    res.json(rows.map((r) => r.category));
+  } catch (err) {
+    console.error("Category fetch error:", err);
+    res.status(500).json({ error: "Failed to load categories" });
+  }
+});
 
 /* ===============================
    ADMIN — UPLOAD IMAGE
@@ -77,15 +96,21 @@ router.post(
         return res.status(400).json({ error: "Image processing failed" });
       }
 
+      /* Put new image at the bottom */
+      const [[maxOrder]] = await db.query(
+        "SELECT COALESCE(MAX(sort_order), 0) AS maxOrder FROM gallery_images"
+      );
+
       await db.query(
         `INSERT INTO gallery_images
-         (filename, caption, category, featured, status)
-         VALUES (?, ?, ?, ?, 'active')`,
+         (filename, caption, category, featured, status, sort_order)
+         VALUES (?, ?, ?, ?, 'active', ?)`,
         [
           req.optimizedFilename,
           caption || "",
           category || "",
           featured ? 1 : 0,
+          maxOrder.maxOrder + 1,
         ]
       );
 
@@ -125,7 +150,47 @@ router.put("/:id", verifyAdmin, async (req, res) => {
 });
 
 /* ===============================
-   ADMIN — DELETE IMAGE
+   ADMIN — REORDER GALLERY (PERSISTENT)
+================================ */
+router.put("/reorder", verifyAdmin, async (req, res) => {
+  const items = req.body; // [{ id, sort_order }]
+
+  if (!Array.isArray(items)) {
+    return res.status(400).json({ error: "Invalid reorder payload" });
+  }
+
+  const conn = await db.getConnection();
+
+  try {
+    await conn.beginTransaction();
+
+    for (const item of items) {
+      if (
+        typeof item.id !== "number" ||
+        typeof item.sort_order !== "number"
+      ) {
+        throw new Error("Invalid reorder data");
+      }
+
+      await conn.query(
+        "UPDATE gallery_images SET sort_order = ? WHERE id = ?",
+        [item.sort_order, item.id]
+      );
+    }
+
+    await conn.commit();
+    res.json({ success: true });
+  } catch (err) {
+    await conn.rollback();
+    console.error("Reorder error:", err);
+    res.status(500).json({ error: "Reorder failed" });
+  } finally {
+    conn.release();
+  }
+});
+
+/* ===============================
+   ADMIN — DELETE IMAGE (SOFT DELETE + FILE)
 ================================ */
 router.delete("/:id", verifyAdmin, async (req, res) => {
   try {
@@ -140,7 +205,7 @@ router.delete("/:id", verifyAdmin, async (req, res) => {
       return res.status(404).json({ error: "Image not found" });
     }
 
-    /* Soft delete in DB */
+    /* Soft delete */
     await db.query(
       "UPDATE gallery_images SET status = 'hidden' WHERE id = ?",
       [id]
@@ -165,23 +230,3 @@ router.delete("/:id", verifyAdmin, async (req, res) => {
 });
 
 export default router;
-/* ===============================
-   PUBLIC — GET CATEGORIES
-================================ */
-router.get("/categories", async (req, res) => {
-  try {
-    const [rows] = await db.query(
-      `SELECT DISTINCT category
-       FROM gallery_images
-       WHERE status = 'active'
-         AND category IS NOT NULL
-         AND category != ''
-       ORDER BY category ASC`
-    );
-
-    res.json(rows.map((r) => r.category));
-  } catch (err) {
-    console.error("Category fetch error:", err);
-    res.status(500).json({ error: "Failed to load categories" });
-  }
-});
