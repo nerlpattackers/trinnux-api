@@ -133,3 +133,34 @@ router.delete("/:id", verifyAdmin, async (req, res) => {
 });
 
 export default router;
+
+/* ===============================
+   ADMIN — REORDER IMAGES
+================================ */
+router.put("/reorder", verifyAdmin, async (req, res) => {
+  try {
+    const updates = req.body; // [{ id, sort_order }]
+
+    if (!Array.isArray(updates)) {
+      return res.status(400).json({ error: "Invalid payload" });
+    }
+
+    const conn = await db.getConnection();
+    await conn.beginTransaction();
+
+    for (const item of updates) {
+      await conn.query(
+        "UPDATE gallery_images SET sort_order = ? WHERE id = ?",
+        [item.sort_order, item.id]
+      );
+    }
+
+    await conn.commit();
+    conn.release();
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Reorder error:", err);
+    res.status(500).json({ error: "Reorder failed" });
+  }
+});
