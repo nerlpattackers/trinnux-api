@@ -1,30 +1,40 @@
 import multer from "multer";
 import sharp from "sharp";
 import path from "path";
+import fs from "fs";
 
-const upload = multer({
+const uploadPath = path.join("uploads", "gallery");
+
+/* Ensure directory exists */
+if (!fs.existsSync(uploadPath)) {
+  fs.mkdirSync(uploadPath, { recursive: true });
+}
+
+/* Multer storage */
+const storage = multer.memoryStorage();
+
+export const uploadGallery = multer({
+  storage,
   limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter(req, file, cb) {
-    if (!file.mimetype.startsWith("image/")) {
-      cb(new Error("Only image files allowed"));
-    }
-    cb(null, true);
-  },
-});
+}).single("image");
 
-export const uploadGallery = upload.single("image");
-
+/* Optimize image */
 export async function optimizeImage(req, res, next) {
-  if (!req.file) return next();
+  try {
+    if (!req.file) return next();
 
-  const filename = `${Date.now()}-${Math.round(Math.random() * 1e9)}.webp`;
-  const outputPath = path.join("uploads", "gallery", filename);
+    const filename = `gallery-${Date.now()}.webp`;
+    const filepath = path.join(uploadPath, filename);
 
-  await sharp(req.file.buffer)
-    .resize({ width: 1600, withoutEnlargement: true })
-    .webp({ quality: 80 })
-    .toFile(outputPath);
+    await sharp(req.file.buffer)
+      .resize(1600)
+      .webp({ quality: 80 })
+      .toFile(filepath);
 
-  req.optimizedFilename = filename;
-  next();
+    req.optimizedFilename = filename;
+    next();
+  } catch (err) {
+    console.error("Image optimization failed:", err);
+    res.status(500).json({ error: "Image optimization failed" });
+  }
 }
