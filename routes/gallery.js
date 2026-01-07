@@ -11,12 +11,12 @@ import {
 const router = express.Router();
 
 /* ===============================
-   PRE-FLIGHT (CORS)
+   PRE-FLIGHT
 ================================ */
 router.options("*", (_, res) => res.sendStatus(204));
 
 /* ===============================
-   PUBLIC — GET GALLERY (SAFE ORDER)
+   PUBLIC — GET GALLERY
 ================================ */
 router.get("/", async (req, res) => {
   try {
@@ -39,14 +39,9 @@ router.get("/", async (req, res) => {
       [limit, offset]
     );
 
-    res.json({
-      total: count.total,
-      page,
-      limit,
-      images: rows,
-    });
+    res.json({ total: count.total, page, limit, images: rows });
   } catch (err) {
-    console.error("Public gallery error:", err);
+    console.error(err);
     res.status(500).json({ error: "Failed to load gallery" });
   }
 });
@@ -55,19 +50,14 @@ router.get("/", async (req, res) => {
    ADMIN — GET GALLERY (MANUAL ORDER)
 ================================ */
 router.get("/admin", verifyAdmin, async (_req, res) => {
-  try {
-    const [rows] = await db.query(`
-      SELECT id, filename, caption, category, featured
-      FROM gallery_images
-      WHERE status='active'
-      ORDER BY sort_order ASC
-    `);
+  const [rows] = await db.query(`
+    SELECT id, filename, caption, category, featured, sort_order
+    FROM gallery_images
+    WHERE status='active'
+    ORDER BY sort_order ASC
+  `);
 
-    res.json({ images: rows });
-  } catch (err) {
-    console.error("Admin gallery error:", err);
-    res.status(500).json({ error: "Failed to load admin gallery" });
-  }
+  res.json({ images: rows });
 });
 
 /* ===============================
@@ -79,68 +69,36 @@ router.post(
   uploadGallery,
   optimizeImage,
   async (req, res) => {
-    try {
-      const { caption = "", category = "", featured = 0 } = req.body;
+    const { caption = "", category = "", featured = 0 } = req.body;
 
-      const [[max]] = await db.query(
-        "SELECT COALESCE(MAX(sort_order), 0) AS max FROM gallery_images"
-      );
+    const [[max]] = await db.query(
+      "SELECT COALESCE(MAX(sort_order), 0) AS max FROM gallery_images"
+    );
 
-      await db.query(
-        `
-        INSERT INTO gallery_images
-        (filename, caption, category, featured, status, sort_order)
-        VALUES (?, ?, ?, ?, 'active', ?)
-        `,
-        [
-          req.optimizedFilename,
-          caption,
-          category,
-          featured ? 1 : 0,
-          max.max + 1,
-        ]
-      );
+    await db.query(
+      `
+      INSERT INTO gallery_images
+      (filename, caption, category, featured, status, sort_order)
+      VALUES (?, ?, ?, ?, 'active', ?)
+      `,
+      [
+        req.optimizedFilename,
+        caption,
+        category,
+        featured ? 1 : 0,
+        max.max + 1,
+      ]
+    );
 
-      res.json({ success: true });
-    } catch (err) {
-      console.error("Upload error:", err);
-      res.status(500).json({ error: "Upload failed" });
-    }
+    res.json({ success: true });
   }
 );
 
 /* ===============================
-   ADMIN — UPDATE METADATA (FIXED)
-================================ */
-router.put("/:id", verifyAdmin, async (req, res) => {
-  try {
-    const { caption = "", category = "", featured = 0 } = req.body;
-
-    await db.query(
-      `
-      UPDATE gallery_images
-      SET caption=?, category=?, featured=?
-      WHERE id=?
-      `,
-      [caption, category, featured ? 1 : 0, req.params.id]
-    );
-
-    res.json({ success: true });
-  } catch (err) {
-    console.error("Update error:", err);
-    res.status(500).json({ error: "Update failed" });
-  }
-});
-
-/* ===============================
-   ADMIN — REORDER (AUTHORITATIVE)
+   🔥 ADMIN — REORDER (MUST BE HERE)
 ================================ */
 router.put("/reorder", verifyAdmin, async (req, res) => {
   const updates = req.body;
-
-  if (!Array.isArray(updates)) {
-    return res.status(400).json({ error: "Invalid payload" });
-  }
 
   const conn = await db.getConnection();
   await conn.beginTransaction();
@@ -165,32 +123,43 @@ router.put("/reorder", verifyAdmin, async (req, res) => {
 });
 
 /* ===============================
+   ADMIN — UPDATE METADATA
+================================ */
+router.put("/:id", verifyAdmin, async (req, res) => {
+  const { caption = "", category = "", featured = 0 } = req.body;
+
+  await db.query(
+    `
+    UPDATE gallery_images
+    SET caption=?, category=?, featured=?
+    WHERE id=?
+    `,
+    [caption, category, featured ? 1 : 0, req.params.id]
+  );
+
+  res.json({ success: true });
+});
+
+/* ===============================
    ADMIN — DELETE
 ================================ */
 router.delete("/:id", verifyAdmin, async (req, res) => {
-  try {
-    const [[image]] = await db.query(
-      "SELECT filename FROM gallery_images WHERE id=?",
-      [req.params.id]
-    );
+  const [[image]] = await db.query(
+    "SELECT filename FROM gallery_images WHERE id=?",
+    [req.params.id]
+  );
 
-    if (!image) {
-      return res.status(404).json({ error: "Image not found" });
-    }
+  if (!image) return res.status(404).json({ error: "Not found" });
 
-    await db.query(
-      "UPDATE gallery_images SET status='hidden' WHERE id=?",
-      [req.params.id]
-    );
+  await db.query(
+    "UPDATE gallery_images SET status='hidden' WHERE id=?",
+    [req.params.id]
+  );
 
-    const filePath = path.join("uploads", "gallery", image.filename);
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  const filePath = path.join("uploads", "gallery", image.filename);
+  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
-    res.json({ success: true });
-  } catch (err) {
-    console.error("Delete error:", err);
-    res.status(500).json({ error: "Delete failed" });
-  }
+  res.json({ success: true });
 });
 
 export default router;
