@@ -21,42 +21,21 @@ if (!fs.existsSync(uploadDir)) {
 }
 
 /* =========================
-   CORS — FINAL & CORRECT
+   CORS — SAFE & PRODUCTION READY
 ========================= */
-const allowedOrigins = [
-  "https://trinnux.com",
-  "https://www.trinnux.com",
-
-  // Railway UAT / Preview domains
-  "https://trinnux-website-uat-production.up.railway.app",
-  "https://trinnux-api-production.up.railway.app",
-
-  // Local dev
-  "http://localhost:3000",
-  "http://localhost:5173",
-];
-
 app.use(
   cors({
-    origin: function (origin, callback) {
-      // Allow non-browser tools (curl, postman)
-      if (!origin) return callback(null, true);
-
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      console.error("❌ Blocked by CORS:", origin);
-      return callback(new Error("Not allowed by CORS"));
-    },
-    credentials: true,
+    origin: [
+      "https://trinnux.com",
+      "https://www.trinnux.com",
+      "https://trinnux-website-uat-production.up.railway.app",
+      "http://localhost:3000",
+      "http://localhost:5173",
+    ],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
-
-/* 🔴 IMPORTANT: handle preflight explicitly */
-app.options("*", cors());
 
 /* =========================
    BODY PARSERS
@@ -78,7 +57,7 @@ app.use("/api/gallery", galleryRoutes);
 /* =========================
    HEALTH CHECK
 ========================= */
-app.get("/", (_, res) => {
+app.get("/", (_req, res) => {
   res.status(200).send("Trinnux API is running");
 });
 
