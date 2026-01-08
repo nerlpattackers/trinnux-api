@@ -12,8 +12,9 @@ const router = express.Router();
 
 /* ===============================
    PUBLIC — GET GALLERY
-   ✅ CATEGORY-SAFE PAGINATION
-   ❌ NO NEW RESPONSE FIELDS
+   ✅ PAGINATION
+   ✅ CATEGORY FILTER
+   ✅ FULL CATEGORY LIST
 ================================ */
 router.get("/", async (req, res) => {
   try {
@@ -22,20 +23,33 @@ router.get("/", async (req, res) => {
     const category = req.query.category || "All";
     const offset = (page - 1) * limit;
 
+    /* ---------------------------
+       COUNT QUERY
+    --------------------------- */
     let countSql =
       "SELECT COUNT(*) AS total FROM gallery_images WHERE status='active'";
+    const countParams = [];
+
+    if (category !== "All") {
+      countSql += " AND category = ?";
+      countParams.push(category);
+    }
+
+    const [[count]] = await db.query(countSql, countParams);
+
+    /* ---------------------------
+       IMAGES QUERY
+    --------------------------- */
     let imagesSql = `
       SELECT id, filename, caption, category, featured
       FROM gallery_images
       WHERE status='active'
     `;
-    const params = [];
+    const imageParams = [];
 
-    // ✅ FILTER BY CATEGORY (FIX)
     if (category !== "All") {
-      countSql += " AND category = ?";
       imagesSql += " AND category = ?";
-      params.push(category);
+      imageParams.push(category);
     }
 
     imagesSql += `
@@ -43,18 +57,30 @@ router.get("/", async (req, res) => {
       LIMIT ? OFFSET ?
     `;
 
-    const [[count]] = await db.query(countSql, params);
     const [rows] = await db.query(imagesSql, [
-      ...params,
+      ...imageParams,
       limit,
       offset,
     ]);
+
+    /* ---------------------------
+       ✅ CATEGORY LIST (GLOBAL)
+    --------------------------- */
+    const [cats] = await db.query(`
+      SELECT DISTINCT category
+      FROM gallery_images
+      WHERE status='active'
+        AND category IS NOT NULL
+        AND category != ''
+      ORDER BY category ASC
+    `);
 
     res.json({
       total: count.total,
       page,
       limit,
       images: rows,
+      categories: cats.map((c) => c.category),
     });
   } catch (err) {
     console.error("Public gallery error:", err);
