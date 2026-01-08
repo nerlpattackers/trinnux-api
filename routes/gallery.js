@@ -12,60 +12,31 @@ const router = express.Router();
 
 /* ===============================
    PUBLIC — GET GALLERY
-   ✅ CATEGORY-SAFE PAGINATION
+   ❌ NO AUTH
 ================================ */
 router.get("/", async (req, res) => {
   try {
     const page = parseInt(req.query.page || "1");
     const limit = parseInt(req.query.limit || "12");
-    const category = req.query.category || "All";
     const offset = (page - 1) * limit;
 
-    let imagesQuery;
-    let countQuery;
-    let params = [];
-    let countParams = [];
+    const [[count]] = await db.query(
+      "SELECT COUNT(*) AS total FROM gallery_images WHERE status='active'"
+    );
 
-    if (category === "All") {
-      // ===== ALL IMAGES =====
-      imagesQuery = `
-        SELECT id, filename, caption, category, featured
-        FROM gallery_images
-        WHERE status='active'
-        ORDER BY featured DESC, sort_order ASC, created_at DESC
-        LIMIT ? OFFSET ?
-      `;
-      countQuery = `
-        SELECT COUNT(*) AS total
-        FROM gallery_images
-        WHERE status='active'
-      `;
-      params = [limit, offset];
-    } else {
-      // ===== CATEGORY FILTERED =====
-      imagesQuery = `
-        SELECT id, filename, caption, category, featured
-        FROM gallery_images
-        WHERE status='active'
-          AND category = ?
-        ORDER BY featured DESC, sort_order ASC, created_at DESC
-        LIMIT ? OFFSET ?
-      `;
-      countQuery = `
-        SELECT COUNT(*) AS total
-        FROM gallery_images
-        WHERE status='active'
-          AND category = ?
-      `;
-      params = [category, limit, offset];
-      countParams = [category];
-    }
-
-    const [rows] = await db.query(imagesQuery, params);
-    const [[{ total }]] = await db.query(countQuery, countParams);
+    const [rows] = await db.query(
+      `
+      SELECT id, filename, caption, category, featured
+      FROM gallery_images
+      WHERE status='active'
+      ORDER BY featured DESC, sort_order ASC, created_at DESC
+      LIMIT ? OFFSET ?
+      `,
+      [limit, offset]
+    );
 
     res.json({
-      total,
+      total: count.total,
       page,
       limit,
       images: rows,
