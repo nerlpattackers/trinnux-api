@@ -12,31 +12,60 @@ const router = express.Router();
 
 /* ===============================
    PUBLIC — GET GALLERY
-   ❌ NO AUTH
+   ✅ CATEGORY-SAFE PAGINATION
 ================================ */
 router.get("/", async (req, res) => {
   try {
     const page = parseInt(req.query.page || "1");
     const limit = parseInt(req.query.limit || "12");
+    const category = req.query.category || "All";
     const offset = (page - 1) * limit;
 
-    const [[count]] = await db.query(
-      "SELECT COUNT(*) AS total FROM gallery_images WHERE status='active'"
-    );
+    let imagesQuery;
+    let countQuery;
+    let params = [];
+    let countParams = [];
 
-    const [rows] = await db.query(
-      `
-      SELECT id, filename, caption, category, featured
-      FROM gallery_images
-      WHERE status='active'
-      ORDER BY featured DESC, sort_order ASC, created_at DESC
-      LIMIT ? OFFSET ?
-      `,
-      [limit, offset]
-    );
+    if (category === "All") {
+      // ===== ALL IMAGES =====
+      imagesQuery = `
+        SELECT id, filename, caption, category, featured
+        FROM gallery_images
+        WHERE status='active'
+        ORDER BY featured DESC, sort_order ASC, created_at DESC
+        LIMIT ? OFFSET ?
+      `;
+      countQuery = `
+        SELECT COUNT(*) AS total
+        FROM gallery_images
+        WHERE status='active'
+      `;
+      params = [limit, offset];
+    } else {
+      // ===== CATEGORY FILTERED =====
+      imagesQuery = `
+        SELECT id, filename, caption, category, featured
+        FROM gallery_images
+        WHERE status='active'
+          AND category = ?
+        ORDER BY featured DESC, sort_order ASC, created_at DESC
+        LIMIT ? OFFSET ?
+      `;
+      countQuery = `
+        SELECT COUNT(*) AS total
+        FROM gallery_images
+        WHERE status='active'
+          AND category = ?
+      `;
+      params = [category, limit, offset];
+      countParams = [category];
+    }
+
+    const [rows] = await db.query(imagesQuery, params);
+    const [[{ total }]] = await db.query(countQuery, countParams);
 
     res.json({
-      total: count.total,
+      total,
       page,
       limit,
       images: rows,
