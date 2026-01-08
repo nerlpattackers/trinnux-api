@@ -12,28 +12,43 @@ const router = express.Router();
 
 /* ===============================
    PUBLIC — GET GALLERY
-   ❌ NO AUTH
+   ✅ CATEGORY-SAFE PAGINATION
+   ❌ NO NEW RESPONSE FIELDS
 ================================ */
 router.get("/", async (req, res) => {
   try {
     const page = parseInt(req.query.page || "1");
     const limit = parseInt(req.query.limit || "12");
+    const category = req.query.category || "All";
     const offset = (page - 1) * limit;
 
-    const [[count]] = await db.query(
-      "SELECT COUNT(*) AS total FROM gallery_images WHERE status='active'"
-    );
-
-    const [rows] = await db.query(
-      `
+    let countSql =
+      "SELECT COUNT(*) AS total FROM gallery_images WHERE status='active'";
+    let imagesSql = `
       SELECT id, filename, caption, category, featured
       FROM gallery_images
       WHERE status='active'
+    `;
+    const params = [];
+
+    // ✅ FILTER BY CATEGORY (FIX)
+    if (category !== "All") {
+      countSql += " AND category = ?";
+      imagesSql += " AND category = ?";
+      params.push(category);
+    }
+
+    imagesSql += `
       ORDER BY featured DESC, sort_order ASC, created_at DESC
       LIMIT ? OFFSET ?
-      `,
-      [limit, offset]
-    );
+    `;
+
+    const [[count]] = await db.query(countSql, params);
+    const [rows] = await db.query(imagesSql, [
+      ...params,
+      limit,
+      offset,
+    ]);
 
     res.json({
       total: count.total,
@@ -52,14 +67,12 @@ router.get("/", async (req, res) => {
 ================================ */
 router.get("/admin", verifyAdmin, async (_req, res) => {
   try {
-    const [rows] = await db.query(
-      `
+    const [rows] = await db.query(`
       SELECT id, filename, caption, category, featured, sort_order
       FROM gallery_images
       WHERE status='active'
       ORDER BY sort_order ASC
-      `
-    );
+    `);
 
     res.json({ images: rows });
   } catch (err) {
