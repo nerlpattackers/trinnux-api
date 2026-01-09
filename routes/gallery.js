@@ -14,7 +14,7 @@ const router = express.Router();
    PUBLIC — GET GALLERY
    ✅ PAGINATION
    ✅ CATEGORY FILTER
-   ✅ FULL CATEGORY LIST
+   ✅ NORMALIZED CATEGORY LIST
 ================================ */
 router.get("/", async (req, res) => {
   try {
@@ -31,8 +31,8 @@ router.get("/", async (req, res) => {
     const countParams = [];
 
     if (category !== "All") {
-      countSql += " AND category = ?";
-      countParams.push(category);
+      countSql += " AND LOWER(TRIM(category)) = ?";
+      countParams.push(category.toLowerCase());
     }
 
     const [[count]] = await db.query(countSql, countParams);
@@ -41,15 +41,17 @@ router.get("/", async (req, res) => {
        IMAGES QUERY
     --------------------------- */
     let imagesSql = `
-      SELECT id, filename, caption, category, featured
+      SELECT id, filename, caption,
+             LOWER(TRIM(category)) AS category,
+             featured
       FROM gallery_images
       WHERE status='active'
     `;
     const imageParams = [];
 
     if (category !== "All") {
-      imagesSql += " AND category = ?";
-      imageParams.push(category);
+      imagesSql += " AND LOWER(TRIM(category)) = ?";
+      imageParams.push(category.toLowerCase());
     }
 
     imagesSql += `
@@ -64,14 +66,14 @@ router.get("/", async (req, res) => {
     ]);
 
     /* ---------------------------
-       ✅ CATEGORY LIST (GLOBAL)
+       CATEGORY LIST (GLOBAL)
     --------------------------- */
     const [cats] = await db.query(`
-      SELECT DISTINCT category
+      SELECT DISTINCT LOWER(TRIM(category)) AS category
       FROM gallery_images
       WHERE status='active'
         AND category IS NOT NULL
-        AND category != ''
+        AND TRIM(category) != ''
       ORDER BY category ASC
     `);
 
@@ -132,7 +134,7 @@ router.post(
         [
           req.optimizedFilename,
           caption,
-          category,
+          category.trim().toLowerCase(),
           featured ? 1 : 0,
           max.max + 1,
         ]
@@ -187,7 +189,7 @@ router.put("/:id", verifyAdmin, async (req, res) => {
       SET caption=?, category=?, featured=?
       WHERE id=?
       `,
-      [caption, category, featured ? 1 : 0, req.params.id]
+      [caption, category.trim().toLowerCase(), featured ? 1 : 0, req.params.id]
     );
 
     res.json({ success: true });
