@@ -31,21 +31,24 @@ if (!fs.existsSync(partnersUploadDir)) {
 }
 
 /* =========================
-   CORS — SAFE & PRODUCTION READY
+   CORS — FIXED (IMPORTANT)
 ========================= */
-app.use(
-  cors({
-    origin: [
-      "https://trinnux.com",
-      "https://www.trinnux.com",
-      "https://trinnux-website-uat-production.up.railway.app",
-      "http://localhost:3000",
-      "http://localhost:5173",
-    ],
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
+const corsOptions = {
+  origin: [
+    "https://trinnux.com",
+    "https://www.trinnux.com",
+    "https://trinnux-website-uat-production.up.railway.app",
+    "http://localhost:3000",
+    "http://localhost:5173",
+  ],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
+
+app.use(cors(corsOptions));
+
+/* 🔑 REQUIRED FOR FILE UPLOAD + AUTH */
+app.options("*", cors(corsOptions));
 
 /* =========================
    BODY PARSERS
@@ -66,7 +69,7 @@ app.use("/api/gallery", galleryRoutes);
 app.use("/api/partners", partnersRoutes);
 
 /* =========================
-   ADMIN ROUTES (🆕)
+   ADMIN ROUTES
 ========================= */
 app.use("/api/admin/partners", adminPartnersRoutes);
 app.use("/api/admin/upload", adminUploadRoutes);
