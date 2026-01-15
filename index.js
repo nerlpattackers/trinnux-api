@@ -5,6 +5,7 @@ import path from "path";
 import dotenv from "dotenv";
 
 import galleryRoutes from "./routes/gallery.js";
+import partners from "./routes/partners.js";
 import authRoutes from "./routes/auth.js";
 
 dotenv.config();
@@ -53,6 +54,7 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 ========================= */
 app.use("/api/auth", authRoutes);
 app.use("/api/gallery", galleryRoutes);
+app.use("/api/partners", partners);
 
 /* =========================
    HEALTH CHECK
