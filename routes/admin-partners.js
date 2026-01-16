@@ -4,6 +4,20 @@ import verifyAdmin from "../middleware/verifyAdmin.js";
 
 const router = express.Router();
 
+router.put("/sort", verifyAdmin, async (req, res) => {
+  const updates = req.body;
+
+  for (const p of updates) {
+    await pool.query(
+      "UPDATE partners SET sort_order=? WHERE id=?",
+      [p.sort_order, p.id]
+    );
+  }
+
+  res.json({ success: true });
+});
+
+
 /* LIST */
 router.get("/", verifyAdmin, async (_req, res) => {
   const [rows] = await pool.query(
