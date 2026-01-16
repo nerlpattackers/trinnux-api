@@ -8,7 +8,6 @@ import galleryRoutes from "./routes/gallery.js";
 import partnersRoutes from "./routes/partners.js";
 import authRoutes from "./routes/auth.js";
 
-/* ADMIN ROUTES */
 import adminPartnersRoutes from "./routes/admin-partners.js";
 import adminUploadRoutes from "./routes/admin-upload.js";
 
@@ -24,34 +23,25 @@ fs.mkdirSync(path.join(__dirname, "uploads", "gallery"), { recursive: true });
 fs.mkdirSync(path.join(__dirname, "uploads", "partners"), { recursive: true });
 
 /* =========================
-   CORS (FIRST)
+   CORS — SINGLE SOURCE OF TRUTH
 ========================= */
-const corsOptions = {
-  origin: [
-    "https://trinnux.com",
-    "https://www.trinnux.com",
-    "https://trinnux-website-uat-production.up.railway.app",
+app.use(
+  cors({
+    origin: [
+      "https://trinnux.com",
+      "https://www.trinnux.com",
+      "https://trinnux-website-uat-production.up.railway.app",
 
-    // 🔑 LOCAL DEV (ALL COMMON VITE PORTS)
-    "http://localhost:3000",
-    "http://localhost:5173",
-    "http://localhost:5174",
-    "http://localhost:5175",
-  ],
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-};
-
-app.use(cors(corsOptions));
-
-/* =========================
-   PREFLIGHT HANDLING
-========================= */
-/**
- * Let CORS handle OPTIONS for /api/auth/*
- * Force 204 only for admin routes (upload / CRUD)
- */
-app.options("/api/admin/*", cors(corsOptions));
+      // Local dev (Vite may change ports)
+      "http://localhost:5173",
+      "http://localhost:5174",
+      "http://localhost:5175",
+      "http://localhost:3000",
+    ],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
 /* =========================
    BODY PARSERS
@@ -65,15 +55,12 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 /* =========================
-   PUBLIC ROUTES
+   ROUTES
 ========================= */
 app.use("/api/auth", authRoutes);
 app.use("/api/gallery", galleryRoutes);
 app.use("/api/partners", partnersRoutes);
 
-/* =========================
-   ADMIN ROUTES
-========================= */
 app.use("/api/admin/partners", adminPartnersRoutes);
 app.use("/api/admin/upload", adminUploadRoutes);
 
