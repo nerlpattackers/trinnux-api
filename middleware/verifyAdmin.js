@@ -1,6 +1,13 @@
 import jwt from "jsonwebtoken";
 
 export default function verifyAdmin(req, res, next) {
+  /* =====================
+     ALLOW CORS PREFLIGHT
+  ===================== */
+  if (req.method === "OPTIONS") {
+    return next();
+  }
+
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {

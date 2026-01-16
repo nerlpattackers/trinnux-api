@@ -8,7 +8,7 @@ import galleryRoutes from "./routes/gallery.js";
 import partnersRoutes from "./routes/partners.js";
 import authRoutes from "./routes/auth.js";
 
-/* 🆕 ADMIN ROUTES */
+/* ADMIN ROUTES */
 import adminPartnersRoutes from "./routes/admin-partners.js";
 import adminUploadRoutes from "./routes/admin-upload.js";
 
@@ -23,15 +23,11 @@ const __dirname = new URL(".", import.meta.url).pathname;
 const galleryUploadDir = path.join(__dirname, "uploads", "gallery");
 const partnersUploadDir = path.join(__dirname, "uploads", "partners");
 
-if (!fs.existsSync(galleryUploadDir)) {
-  fs.mkdirSync(galleryUploadDir, { recursive: true });
-}
-if (!fs.existsSync(partnersUploadDir)) {
-  fs.mkdirSync(partnersUploadDir, { recursive: true });
-}
+fs.mkdirSync(galleryUploadDir, { recursive: true });
+fs.mkdirSync(partnersUploadDir, { recursive: true });
 
 /* =========================
-   CORS — FIXED (IMPORTANT)
+   CORS (MUST BE FIRST)
 ========================= */
 const corsOptions = {
   origin: [
@@ -47,8 +43,8 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-/* 🔑 REQUIRED FOR FILE UPLOAD + AUTH */
-app.options("*", cors(corsOptions));
+/* 🔑 PRE-FLIGHT — MUST BE BEFORE ROUTES */
+app.options("/api/*", cors(corsOptions));
 
 /* =========================
    BODY PARSERS
