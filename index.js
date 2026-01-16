@@ -24,15 +24,19 @@ fs.mkdirSync(path.join(__dirname, "uploads", "gallery"), { recursive: true });
 fs.mkdirSync(path.join(__dirname, "uploads", "partners"), { recursive: true });
 
 /* =========================
-   CORS — ABSOLUTE FIRST
+   CORS (FIRST)
 ========================= */
 const corsOptions = {
   origin: [
     "https://trinnux.com",
     "https://www.trinnux.com",
     "https://trinnux-website-uat-production.up.railway.app",
+
+    // 🔑 LOCAL DEV (ALL COMMON VITE PORTS)
     "http://localhost:3000",
     "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:5175",
   ],
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
@@ -40,13 +44,14 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-/* 🚨 HARD STOP PREFLIGHT (THIS IS THE KEY FIX) */
-app.use((req, res, next) => {
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(204);
-  }
-  next();
-});
+/* =========================
+   PREFLIGHT HANDLING
+========================= */
+/**
+ * Let CORS handle OPTIONS for /api/auth/*
+ * Force 204 only for admin routes (upload / CRUD)
+ */
+app.options("/api/admin/*", cors(corsOptions));
 
 /* =========================
    BODY PARSERS
