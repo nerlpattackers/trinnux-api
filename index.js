@@ -20,14 +20,11 @@ const __dirname = new URL(".", import.meta.url).pathname;
 /* =========================
    ENSURE UPLOAD DIRECTORIES
 ========================= */
-const galleryUploadDir = path.join(__dirname, "uploads", "gallery");
-const partnersUploadDir = path.join(__dirname, "uploads", "partners");
-
-fs.mkdirSync(galleryUploadDir, { recursive: true });
-fs.mkdirSync(partnersUploadDir, { recursive: true });
+fs.mkdirSync(path.join(__dirname, "uploads", "gallery"), { recursive: true });
+fs.mkdirSync(path.join(__dirname, "uploads", "partners"), { recursive: true });
 
 /* =========================
-   CORS (MUST BE FIRST)
+   CORS — ABSOLUTE FIRST
 ========================= */
 const corsOptions = {
   origin: [
@@ -43,8 +40,13 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-/* 🔑 PRE-FLIGHT — MUST BE BEFORE ROUTES */
-app.options("/api/*", cors(corsOptions));
+/* 🚨 HARD STOP PREFLIGHT (THIS IS THE KEY FIX) */
+app.use((req, res, next) => {
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+  next();
+});
 
 /* =========================
    BODY PARSERS
